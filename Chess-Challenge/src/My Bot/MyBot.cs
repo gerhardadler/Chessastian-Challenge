@@ -1,8 +1,51 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
 using ChessChallenge.API;
 using ChessChallenge.Application;
+
+// Define a class to represent the game state
+public class GameState
+{
+    // Define properties to represent the game state and its evaluation
+    public int Depth { get; set; }
+    public int Eval { get; set; }
+    // You can add other properties as needed based on your specific game.
+    public GameState(int depth, int evaluation)
+    {
+        Depth = depth;
+        Eval = evaluation;
+    }
+
+}
+
+public class TranspositionTable
+{
+    private Dictionary<ulong, GameState> table;
+
+    public TranspositionTable()
+    {
+        table = new Dictionary<ulong, GameState>();
+    }
+
+    public void Add(ulong key, GameState gameState)
+    {
+        if (!table.ContainsKey(key))
+        {
+            table[key] = gameState;
+        }
+    }
+
+    public GameState? Lookup(ulong key)
+    {
+        if (table.ContainsKey(key))
+        {
+            return table[key];
+        }
+        return null;
+    }
+}
 
 public class MyBot : IChessBot
 {
@@ -12,6 +55,8 @@ public class MyBot : IChessBot
     Move bestMove;
     int evaluatedPositions;
     int evaluatedCapturePositions;
+
+    TranspositionTable transpositionTable = new TranspositionTable();
 
     public Move Think(Board board, Timer timer)
     {
@@ -55,8 +100,15 @@ public class MyBot : IChessBot
 
         foreach (Move move in moves)
         {
+            int eval;
             board.MakeMove(move);
-            int eval = -Search(board, depth - 1, -beta, -alpha, false);
+            GameState? gameState = transpositionTable.Lookup(board.ZobristKey);
+
+            if (gameState != null && gameState.Depth >= depth)
+                eval = gameState.Eval;
+            else 
+                eval = -Search(board, depth - 1, -beta, -alpha, false);
+            transpositionTable.Add(board.ZobristKey, new GameState(depth, eval));
             board.UndoMove(move);
 
             if (eval >= beta) return beta;
