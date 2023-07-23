@@ -6,6 +6,7 @@ using ChessChallenge.Application;
 
 public class MyBot : IChessBot
 {
+    int infinity = 999999;
     int[] pieceValues = { 100, 300, 300, 500, 900, 10000 };
 
     Move bestMove;
@@ -16,7 +17,7 @@ public class MyBot : IChessBot
         int color = board.IsWhiteToMove ? 1 : -1;
 
         bestMove = Move.NullMove;
-        Search(board, 5, -99999, 99999, true, true, true);
+        Search(board, 4, -infinity, infinity, true);
 
         // Console.WriteLine(Evaluate(board));
         // Console.WriteLine(bestMove);
@@ -30,52 +31,66 @@ public class MyBot : IChessBot
     }
 
 
-    int Search(Board board, int depth, int alpha, int beta, bool isRoot, bool doPruning, bool doSorting)
+    int Search(Board board, int depth, int alpha, int beta, bool isRoot)
     {
-        if (depth == 0)
-        {
-            // evaluatedPositions += 1;
-            return Evaluate(board);
-        }
+        if (board.IsInCheckmate()) return -infinity;
+        if (board.IsDraw()) return 0;
+
         Move[] moves = board.GetLegalMoves();
 
-        if (moves.Length == 0)
+        if (depth == 0 || moves.Length == 0)
         {
-            if (board.IsInCheckmate())
-            {
-                return -99999;
-            }
-            return 0;
+            return SearchOnlyCaptures(board, -infinity, infinity);
         }
 
-        if (doSorting)
-        {
-            OrderMoves(moves, board);
-        }
+        OrderMoves(moves, board);
 
-        int bestEval = -99999;
+        int bestEval = -infinity - 1;
 
         foreach (Move move in moves)
         {
             board.MakeMove(move);
-            int eval = -Search(board, depth - 1, -beta, -alpha, false, doPruning, doSorting);
+            int eval = -Search(board, depth - 1, -beta, -alpha, false);
             board.UndoMove(move);
             if (eval > bestEval)
             {
                 bestEval = eval;
                 if (isRoot) bestMove = move;
             }
-            if (doPruning)
+            alpha = Math.Max(alpha, bestEval);
+            if (alpha >= beta)
             {
-                alpha = Math.Max(alpha, bestEval);
-                if (alpha >= beta)
-                {
-                    break;
-                }
+                break;
             }
         }
         return bestEval;
     }
+
+    int SearchOnlyCaptures(Board board, int alpha, int beta)
+    {
+        int stand_pat = Evaluate(board);
+        if (stand_pat >= beta)
+            return beta;
+        if (alpha < stand_pat)
+            alpha = stand_pat;
+
+        Move[] moves = board.GetLegalMoves(true);
+
+
+        foreach (Move move in moves)
+        {
+            board.MakeMove(move);
+            int eval = -SearchOnlyCaptures(board, -beta, -alpha);
+            board.UndoMove(move);
+
+            if (eval >= beta)
+                return beta;
+            if (eval > alpha)
+                alpha = eval;
+        }
+        return alpha;
+    }
+
 
     void OrderMoves(Move[] moves, Board board)
     {
@@ -99,6 +114,8 @@ public class MyBot : IChessBot
 
     int Evaluate(Board board)
     {
+        Move[] moves = board.GetLegalMoves();
+
         int eval = 0;
         PieceList[] pieces = board.GetAllPieceLists();
         int index = 0;
@@ -110,7 +127,7 @@ public class MyBot : IChessBot
             index++;
         }
 
-        eval += board.GetLegalMoves().Length * 2;
+        eval += moves.Length * 2;
 
         return eval;
     }

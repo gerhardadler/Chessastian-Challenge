@@ -7,6 +7,7 @@ namespace ChessChallenge.Example
     // Plays randomly otherwise.
     public class EvilBot : IChessBot
     {
+        int infinity = 999999;
         int[] pieceValues = { 100, 300, 300, 500, 900, 10000 };
 
         Move bestMove;
@@ -17,7 +18,7 @@ namespace ChessChallenge.Example
             int color = board.IsWhiteToMove ? 1 : -1;
 
             bestMove = Move.NullMove;
-            Search(board, 5, -99999, 99999, true, true, true);
+            Search(board, 5, -infinity, infinity, true, false);
 
             // Console.WriteLine(Evaluate(board));
             // Console.WriteLine(bestMove);
@@ -31,48 +32,41 @@ namespace ChessChallenge.Example
         }
 
 
-        int Search(Board board, int depth, int alpha, int beta, bool isRoot, bool doPruning, bool doSorting)
+        int Search(Board board, int depth, int alpha, int beta, bool isRoot, bool onlyCaptures)
         {
-            if (depth == 0)
+            if (board.IsInCheckmate()) return -infinity;
+            if (board.IsDraw()) return 0;
+
+            Move[] moves = board.GetLegalMoves(capturesOnly: onlyCaptures);
+            
+            if (depth == 0 || moves.Length == 0)
             {
                 // evaluatedPositions += 1;
-                return Evaluate(board);
-            }
-            Move[] moves = board.GetLegalMoves();
-
-            if (moves.Length == 0)
-            {
-                if (board.IsInCheckmate())
-                {
-                    return -99999;
-                }
-                return 0;
+                // if (onlyCaptures)
+                // {
+                    return Evaluate(board);
+                // }
+                return -Search(board, 32, -beta, -alpha, false, true);
             }
 
-            if (doSorting)
-            {
-                OrderMoves(moves, board);
-            }
+            OrderMoves(moves, board);
 
-            int bestEval = -99999;
+            int bestEval = -infinity - 1;
 
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
-                int eval = -Search(board, depth - 1, -beta, -alpha, false, doPruning, doSorting);
+                int eval = -Search(board, depth - 1, -beta, -alpha, false, onlyCaptures);
                 board.UndoMove(move);
                 if (eval > bestEval)
                 {
                     bestEval = eval;
                     if (isRoot) bestMove = move;
                 }
-                if (doPruning)
+                alpha = Math.Max(alpha, bestEval);
+                if (alpha >= beta)
                 {
-                    alpha = Math.Max(alpha, bestEval);
-                    if (alpha >= beta)
-                    {
-                        break;
-                    }
+                    break;
                 }
             }
             return bestEval;
@@ -100,6 +94,8 @@ namespace ChessChallenge.Example
 
         int Evaluate(Board board)
         {
+            Move[] moves = board.GetLegalMoves();
+
             int eval = 0;
             PieceList[] pieces = board.GetAllPieceLists();
             int index = 0;
@@ -110,6 +106,8 @@ namespace ChessChallenge.Example
                 eval += pieceList.Count * pieceValues[index % 6] * colorMultiplyer;
                 index++;
             }
+
+            eval += moves.Length * 2;
 
             return eval;
         }
