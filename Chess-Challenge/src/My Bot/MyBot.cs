@@ -11,13 +11,19 @@ public class MyBot : IChessBot
 
     Move bestMove;
     int evaluatedPositions;
+    int evaluatedCapturePositions;
 
     public Move Think(Board board, Timer timer)
     {
         int color = board.IsWhiteToMove ? 1 : -1;
 
         bestMove = Move.NullMove;
-        Search(board, 4, -infinity, infinity, true);
+        // evaluatedPositions = 0;
+        // evaluatedCapturePositions = 0;
+        // var watch = System.Diagnostics.Stopwatch.StartNew();
+        Search(board, 5, -infinity, infinity, true);
+        // watch.Stop();
+        // Console.WriteLine("No ordering:" + watch.ElapsedMilliseconds + " - " + evaluatedPositions + " - " + evaluatedCapturePositions + " - " + bestMove);
 
         // Console.WriteLine(Evaluate(board));
         // Console.WriteLine(bestMove);
@@ -33,49 +39,46 @@ public class MyBot : IChessBot
 
     int Search(Board board, int depth, int alpha, int beta, bool isRoot)
     {
-        if (board.IsInCheckmate()) return -infinity;
+        // plus one to make checkmate better than not moving
+        if (board.IsInCheckmate()) return -infinity + 1;
         if (board.IsDraw()) return 0;
 
         Move[] moves = board.GetLegalMoves();
 
         if (depth == 0 || moves.Length == 0)
         {
+            // evaluatedPositions += 1;
             return SearchOnlyCaptures(board, -infinity, infinity);
         }
 
         OrderMoves(moves, board);
-
-        int bestEval = -infinity - 1;
 
         foreach (Move move in moves)
         {
             board.MakeMove(move);
             int eval = -Search(board, depth - 1, -beta, -alpha, false);
             board.UndoMove(move);
-            if (eval > bestEval)
+
+            if (eval >= beta) return beta;
+            if (eval > alpha)
             {
-                bestEval = eval;
                 if (isRoot) bestMove = move;
-            }
-            alpha = Math.Max(alpha, bestEval);
-            if (alpha >= beta)
-            {
-                break;
+                alpha = eval;
             }
         }
-        return bestEval;
+        return alpha;
     }
 
     int SearchOnlyCaptures(Board board, int alpha, int beta)
     {
+        // evaluatedCapturePositions += 1;
         int stand_pat = Evaluate(board);
-        if (stand_pat >= beta)
-            return beta;
-        if (alpha < stand_pat)
-            alpha = stand_pat;
+        if (stand_pat >= beta) return beta;
+        alpha = Math.Max(alpha, stand_pat);
 
         Move[] moves = board.GetLegalMoves(true);
 
+        OrderMoves(moves, board);
 
         foreach (Move move in moves)
         {
@@ -83,10 +86,8 @@ public class MyBot : IChessBot
             int eval = -SearchOnlyCaptures(board, -beta, -alpha);
             board.UndoMove(move);
 
-            if (eval >= beta)
-                return beta;
-            if (eval > alpha)
-                alpha = eval;
+            if (eval >= beta) return beta;
+            alpha = Math.Max(alpha, eval);
         }
         return alpha;
     }

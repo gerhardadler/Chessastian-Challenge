@@ -18,7 +18,7 @@ namespace ChessChallenge.Example
             int color = board.IsWhiteToMove ? 1 : -1;
 
             bestMove = Move.NullMove;
-            Search(board, 5, -infinity, infinity, true, false);
+            Search(board, 4, -infinity, infinity, true);
 
             // Console.WriteLine(Evaluate(board));
             // Console.WriteLine(bestMove);
@@ -32,21 +32,16 @@ namespace ChessChallenge.Example
         }
 
 
-        int Search(Board board, int depth, int alpha, int beta, bool isRoot, bool onlyCaptures)
+        int Search(Board board, int depth, int alpha, int beta, bool isRoot)
         {
             if (board.IsInCheckmate()) return -infinity;
             if (board.IsDraw()) return 0;
 
-            Move[] moves = board.GetLegalMoves(capturesOnly: onlyCaptures);
-            
+            Move[] moves = board.GetLegalMoves();
+
             if (depth == 0 || moves.Length == 0)
             {
-                // evaluatedPositions += 1;
-                // if (onlyCaptures)
-                // {
-                    return Evaluate(board);
-                // }
-                return -Search(board, 32, -beta, -alpha, false, true);
+                return SearchOnlyCaptures(board, -infinity, infinity);
             }
 
             OrderMoves(moves, board);
@@ -56,7 +51,7 @@ namespace ChessChallenge.Example
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
-                int eval = -Search(board, depth - 1, -beta, -alpha, false, onlyCaptures);
+                int eval = -Search(board, depth - 1, -beta, -alpha, false);
                 board.UndoMove(move);
                 if (eval > bestEval)
                 {
@@ -71,6 +66,32 @@ namespace ChessChallenge.Example
             }
             return bestEval;
         }
+
+        int SearchOnlyCaptures(Board board, int alpha, int beta)
+        {
+            int stand_pat = Evaluate(board);
+            if (stand_pat >= beta)
+                return beta;
+            if (alpha < stand_pat)
+                alpha = stand_pat;
+
+            Move[] moves = board.GetLegalMoves(true);
+
+
+            foreach (Move move in moves)
+            {
+                board.MakeMove(move);
+                int eval = -SearchOnlyCaptures(board, -beta, -alpha);
+                board.UndoMove(move);
+
+                if (eval >= beta)
+                    return beta;
+                if (eval > alpha)
+                    alpha = eval;
+            }
+            return alpha;
+        }
+
 
         void OrderMoves(Move[] moves, Board board)
         {
