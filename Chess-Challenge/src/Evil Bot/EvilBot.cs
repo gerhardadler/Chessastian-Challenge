@@ -1,13 +1,14 @@
 ﻿using ChessChallenge.API;
 using System;
 
+
+
 namespace ChessChallenge.Example
 {
     // A simple bot that can spot mate in one, and always captures the most valuable piece it can.
     // Plays randomly otherwise.
     public class EvilBot : IChessBot
     {
-
         int infinity = 999999;
         int[] pieceValues = { 100, 300, 300, 500, 900, 10000 };
 
@@ -15,17 +16,19 @@ namespace ChessChallenge.Example
         int evaluatedPositions;
         int evaluatedCapturePositions;
 
+        TranspositionTable transpositionTable = new();
+
         public Move Think(Board board, Timer timer)
         {
             int color = board.IsWhiteToMove ? 1 : -1;
 
             bestMove = Move.NullMove;
-            // evaluatedPositions = 0;
-            // evaluatedCapturePositions = 0;
-            // var watch = System.Diagnostics.Stopwatch.StartNew();
+            evaluatedPositions = 0;
+            evaluatedCapturePositions = 0;
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             Search(board, 5, -infinity, infinity, true);
-            // watch.Stop();
-            // Console.WriteLine("No ordering:" + watch.ElapsedMilliseconds + " - " + evaluatedPositions + " - " + evaluatedCapturePositions + " - " + bestMove);
+            watch.Stop();
+            Console.WriteLine("Transposition:" + watch.ElapsedMilliseconds + " - " + evaluatedPositions + " - " + evaluatedCapturePositions + " - " + bestMove);
 
             // Console.WriteLine(Evaluate(board));
             // Console.WriteLine(bestMove);
@@ -38,6 +41,11 @@ namespace ChessChallenge.Example
             return pieceValues[(int)(pieceType - 1)];
         }
 
+
+        // Move IterativeSearch(Board board, )
+        // {
+
+        // }
 
         int Search(Board board, int depth, int alpha, int beta, bool isRoot)
         {
@@ -53,12 +61,21 @@ namespace ChessChallenge.Example
                 return SearchOnlyCaptures(board, -infinity, infinity);
             }
 
+            GameState? gameState = transpositionTable.Lookup(board.ZobristKey);
+            if (gameState != null && gameState.Depth >= depth)
+            {
+                if (isRoot) bestMove = gameState.BestMove;
+
+                return gameState.Eval;
+            }
+
             OrderMoves(moves, board);
 
             foreach (Move move in moves)
             {
+                int eval;
                 board.MakeMove(move);
-                int eval = -Search(board, depth - 1, -beta, -alpha, false);
+                eval = -Search(board, depth - 1, -beta, -alpha, false);
                 board.UndoMove(move);
 
                 if (eval >= beta) return beta;
@@ -68,8 +85,10 @@ namespace ChessChallenge.Example
                     alpha = eval;
                 }
             }
+            transpositionTable.Add(board.ZobristKey, new GameState(depth, alpha, bestMove));
             return alpha;
         }
+
 
         int SearchOnlyCaptures(Board board, int alpha, int beta)
         {
