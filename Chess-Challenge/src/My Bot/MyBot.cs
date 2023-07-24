@@ -11,11 +11,13 @@ public class GameState
     // Define properties to represent the game state and its evaluation
     public int Depth { get; set; }
     public int Eval { get; set; }
+    public Move BestMove { get; set; }
     // You can add other properties as needed based on your specific game.
-    public GameState(int depth, int evaluation)
+    public GameState(int depth, int evaluation, Move bestMove)
     {
         Depth = depth;
         Eval = evaluation;
+        BestMove = bestMove;
     }
 
 }
@@ -56,19 +58,19 @@ public class MyBot : IChessBot
     int evaluatedPositions;
     int evaluatedCapturePositions;
 
-    TranspositionTable transpositionTable = new TranspositionTable();
+    TranspositionTable transpositionTable = new();
 
     public Move Think(Board board, Timer timer)
     {
         int color = board.IsWhiteToMove ? 1 : -1;
 
         bestMove = Move.NullMove;
-        // evaluatedPositions = 0;
-        // evaluatedCapturePositions = 0;
-        // var watch = System.Diagnostics.Stopwatch.StartNew();
+        evaluatedPositions = 0;
+        evaluatedCapturePositions = 0;
+        var watch = System.Diagnostics.Stopwatch.StartNew();
         Search(board, 5, -infinity, infinity, true);
-        // watch.Stop();
-        // Console.WriteLine("No ordering:" + watch.ElapsedMilliseconds + " - " + evaluatedPositions + " - " + evaluatedCapturePositions + " - " + bestMove);
+        watch.Stop();
+        Console.WriteLine("Transposition:" + watch.ElapsedMilliseconds + " - " + evaluatedPositions + " - " + evaluatedCapturePositions + " - " + bestMove);
 
         // Console.WriteLine(Evaluate(board));
         // Console.WriteLine(bestMove);
@@ -92,8 +94,16 @@ public class MyBot : IChessBot
 
         if (depth == 0 || moves.Length == 0)
         {
-            // evaluatedPositions += 1;
+            evaluatedPositions += 1;
             return SearchOnlyCaptures(board, -infinity, infinity);
+        }
+
+        GameState? gameState = transpositionTable.Lookup(board.ZobristKey);
+        if (gameState != null && gameState.Depth >= depth)
+        {
+            if (isRoot) bestMove = gameState.BestMove;
+
+            return gameState.Eval;
         }
 
         OrderMoves(moves, board);
@@ -102,13 +112,7 @@ public class MyBot : IChessBot
         {
             int eval;
             board.MakeMove(move);
-            GameState? gameState = transpositionTable.Lookup(board.ZobristKey);
-
-            if (gameState != null && gameState.Depth >= depth)
-                eval = gameState.Eval;
-            else 
-                eval = -Search(board, depth - 1, -beta, -alpha, false);
-            transpositionTable.Add(board.ZobristKey, new GameState(depth, eval));
+            eval = -Search(board, depth - 1, -beta, -alpha, false);
             board.UndoMove(move);
 
             if (eval >= beta) return beta;
@@ -118,12 +122,13 @@ public class MyBot : IChessBot
                 alpha = eval;
             }
         }
+        transpositionTable.Add(board.ZobristKey, new GameState(depth, alpha, bestMove));
         return alpha;
     }
 
     int SearchOnlyCaptures(Board board, int alpha, int beta)
     {
-        // evaluatedCapturePositions += 1;
+        evaluatedCapturePositions += 1;
         int stand_pat = Evaluate(board);
         if (stand_pat >= beta) return beta;
         alpha = Math.Max(alpha, stand_pat);
